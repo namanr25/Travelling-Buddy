@@ -1,17 +1,11 @@
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
-
-    //unique id 
-  place: {type:mongoose.Schema.Types.ObjectId, required:true, ref:'Place'},
-  user: {type:mongoose.Schema.Types.ObjectId, required:true}, //we neeed mltiple user._id refrence 
-  checkIn: {type:Date, required:true}, //booking date -start date
-  checkOut: {type:Date, required:true}, //end date - given not taken
-  name: {type:String, required:true}, //not needed
-  phone: {type:String, required:true}, //not needed 
-  price: Number, // 3 prises needed
+    place: { type: mongoose.Schema.Types.ObjectId, ref: 'Place', required: true },
+    users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }],
+    checkIn: { type: Date, required: true },
+    priceSelectedByUser: Number
 });
 
-const BookingModel = mongoose.model('Booking', bookingSchema);
-
-module.exports = BookingModel;
+const Booking = mongoose.model('Booking', bookingSchema);
+module.exports = Booking;

@@ -1,19 +1,19 @@
 const mongoose = require('mongoose');
 
 const placeSchema = new mongoose.Schema({
-  owner: {type:mongoose.Schema.Types.ObjectId, ref:'User'},
-  title: String,
-  address: String, 
-  photos: [String],
-  description: String,
-  perks: [String],
-  extraInfo: String,
-  checkIn: Number,
-  checkOut: Number,
-  maxGuests: Number,  
-  price: Number,
+    title: String,
+    locationsToVisit: String,
+    photos: [String],
+    description: String,
+    perks: [String],
+    extraInfo: String,
+    priceToOutput: {
+        economy: Number,
+        medium: Number,
+        luxury: Number
+    },
+    basePrice: Number // Always set to economy price
 });
 
-const PlaceModel = mongoose.model('Place', placeSchema);
-
-module.exports = PlaceModel;
+const Place = mongoose.model('Place', placeSchema);
+module.exports = Place;

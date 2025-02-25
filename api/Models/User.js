@@ -1,21 +1,23 @@
 const mongoose = require('mongoose');
-const {Schema} = mongoose;
+const { Schema } = mongoose;
 
+// one user has many bookings at different days
 const UserSchema = new Schema({
-    name : String,
-    email: {type:String , unique:true} ,
-    password : String,
-    //address - line 1,2,3
-    //profession
-    //age
-    //insta id / facebook
-    //phone no ??
-    //personality category - int 
-    //booking id[array] -refrence to take my bookings
-    //
+    name: { type: String, required: true },
+    email: { type: String, unique: true, required: true }, // userID
+    
+    password: { type: String, required: true },
+    addressLine1: { type: String },
+    addressLine2: { type: String },
+    addressLine3: { type: String },
+    profession: { type: String },
+    age: { type: Number, min: 18 },
+    socialMediaID: { type: String },
+    phone: { type: String, unique: true },
+    personalityCategory: { type: Number },
+    bookingIds: [{ type: String }]
+});
 
-}); 
+const UserModel = mongoose.model('User', UserSchema);
 
-const UserModel = mongoose.model('User' , UserSchema);
- 
 module.exports = UserModel;
