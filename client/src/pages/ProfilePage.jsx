@@ -22,7 +22,7 @@ export default function ProfilePage() {
             axios.get(`/user-info/${user.email}`)
                 .then(response => {
                     console.log("Fetched User Info: ", response.data);
-                    setUserInfo(response.data)
+                    setUserInfo(response.data);
                 })
                 .catch(error => console.error("Error fetching user info:", error));
         }
@@ -62,7 +62,7 @@ export default function ProfilePage() {
                         {/* SVG Person Icon */}
                         <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 text-gray-600">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 21a8.25 8.25 0 0115 0" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                             </svg>
                         </div>
 
@@ -73,16 +73,25 @@ export default function ProfilePage() {
                             <p className="text-gray-700">Age: {userInfo?.age || "--"} years</p>
                             <p className="text-blue-500">
                                 <a href={userInfo?.socialMediaID || "#"} target="_blank" rel="noopener noreferrer">
-                                {userInfo?.socialMediaID ? "Social Media Profile" : "No Social Media Added"}
+                                    {userInfo?.socialMediaID ? "Social Media Profile" : "No Social Media Added"}
                                 </a>
                             </p>
                             <p className="text-gray-600">{userInfo?.email || "email@example.com"}</p>
                             <p className="text-gray-700">
                                 {userInfo?.addressLine1 || "Address Line 1"}, {userInfo?.addressLine2 || "Address Line 2"}, {userInfo?.addressLine3 || "Address Line 3"}
                             </p>
-                            <p className="font-bold">Personality Category: <span className="text-blue-600">{userInfo?.personalityCategory || 5}</span></p>
+                            <p className="font-bold">Personality Category: <span className="text-blue-600">{userInfo?.personalityCategory || "Not Taken"}</span></p>
                         </div>
                     </div>
+
+                    {/* Take Personality Test Button (Only if not taken) */}
+                    {!userInfo?.personalityCategory && (
+                        <div className="text-center mt-6">
+                            <Link to="/personality-test" className="bg-primary text-white px-6 py-2 rounded-md">
+                                Take Personality Test
+                            </Link>
+                        </div>
+                    )}
 
                     {/* Logout Button */}
                     <div className="text-center mt-6">

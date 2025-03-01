@@ -33,6 +33,7 @@ export default function TravelBuddyProfile() {
                     {buddyInfo.socialMediaID && (
                         <p className="text-blue-500"><a href={buddyInfo.socialMediaID} target="_blank" rel="noopener noreferrer">Connect on Social Media</a></p>
                     )}
+                    <p className="font-bold mt-2">Personality Category: <span className="text-blue-600">{buddyInfo.personalityCategory || "Not Assigned"}</span></p>
                 </div>
             </div>
         </div>

@@ -15,28 +15,54 @@ export default function PlacesFormPage() {
     const [extraInfo, setExtraInfo] = useState("");
     const [priceToOutput, setPriceToOutput] = useState({ economy: 0, medium: 0, luxury: 0 });
     const [basePrice, setBasePrice] = useState(0);
+    const [itinerary, setItinerary] = useState({
+        economy: Array(3).fill({ day: 0, activity: "" }),
+        medium: Array(4).fill({ day: 0, activity: "" }),
+        luxury: Array(5).fill({ day: 0, activity: "" })
+    });
     const [redirect, setRedirect] = useState(false);
 
-    // Fetch place details if editing an existing place
     useEffect(() => {
         if (!id) return;
-
-        axios.get(`/places/${id}`)
-            .then(response => {
-                const data = response.data;
-                setTitle(data.title);
-                setLocationsToVisit(data.locationsToVisit);
-                setAddedPhotos(data.photos);
-                setDescription(data.description);
-                setPerks(data.perks);
-                setExtraInfo(data.extraInfo);
-                setPriceToOutput(data.priceToOutput);
-                setBasePrice(data.priceToOutput?.economy || 0);
-            })
-            .catch(error => console.error("❌ Error fetching place:", error));
+        axios.get(`/places/${id}`).then(response => {
+            const data = response.data;
+            setTitle(data.title);
+            setLocationsToVisit(data.locationsToVisit);
+            setAddedPhotos(data.photos);
+            setDescription(data.description);
+            setPerks(data.perks);
+            setExtraInfo(data.extraInfo);
+            setPriceToOutput(data.priceToOutput);
+            setBasePrice(data.priceToOutput?.economy || 0);
+            setItinerary(data.itinerary || itinerary);
+        });
     }, [id]);
 
-    // Save or update place
+    function handleItineraryChange(category, index, value) {
+        setItinerary(prev => {
+            const updated = [...prev[category]];
+            updated[index] = { day: index + 1, activity: value };
+            return { ...prev, [category]: updated };
+        });
+    }
+
+    function inputHeader(text) {
+        return <h2 className="font-bold text-2xl mt-4">{text}</h2>;
+    }
+
+    function inputDescription(text) {
+        return <p className="text-gray-500 text-sm">{text}</p>;
+    }
+
+    function preInput(header, description) {
+        return (
+            <>
+                {inputHeader(header)}
+                {inputDescription(description)}
+            </>
+        );
+    }
+
     async function savePlace(ev) {
         ev.preventDefault();
         const placeData = {
@@ -47,9 +73,9 @@ export default function PlacesFormPage() {
             perks,
             extraInfo,
             priceToOutput,
-            basePrice: priceToOutput.economy, // Always set economy as base price
+            basePrice: priceToOutput.economy,
+            itinerary
         };
-
         try {
             if (id) {
                 await axios.put(`/places/${id}`, placeData);
@@ -64,24 +90,21 @@ export default function PlacesFormPage() {
     }
 
     if (redirect) {
-        return <Navigate to={"/account/places"} />;
+        return <Navigate to={"/admin"} />;
     }
 
-    function inputHeader(text) {
-        return <h2 className="text-2xl mt-4">{text}</h2>;
-    }
-
-    function inputDescription(text) {
-        return <p className="text-gray-500 text-sm">{text}</p>;
-    }
-
-    function preInput(header, description) {
-        return (
-            <>
-                {inputHeader(header)}
-                {inputDescription(description)}
-            </>
-        );
+    function renderItineraryInputs(category) {
+        return itinerary[category].map((item, index) => (
+            <div key={index}>
+                <h4 className="font-bold">Day {index + 1}</h4>
+                <input
+                    type="text"
+                    value={item.activity}
+                    onChange={(ev) => handleItineraryChange(category, index, ev.target.value)}
+                    placeholder={`Activity for Day ${index + 1}`}
+                />
+            </div>
+        ));
     }
 
     return (
@@ -108,40 +131,26 @@ export default function PlacesFormPage() {
 
                 {preInput("Pricing", "Set different price categories.")}
                 <div className="grid gap-2 grid-cols-3">
-                    <div>
-                        <h3 className="mt-2 -mb-1">Economy Price</h3>
-                        <input
-                            type="number"
-                            value={priceToOutput.economy}
-                            onChange={(ev) =>
-                                setPriceToOutput((prev) => ({ ...prev, economy: Number(ev.target.value) }))
-                            }
-                            placeholder="Economy price"
-                        />
-                    </div>
-                    <div>
-                        <h3 className="mt-2 -mb-1">Medium Price</h3>
-                        <input
-                            type="number"
-                            value={priceToOutput.medium}
-                            onChange={(ev) =>
-                                setPriceToOutput((prev) => ({ ...prev, medium: Number(ev.target.value) }))
-                            }
-                            placeholder="Medium price"
-                        />
-                    </div>
-                    <div>
-                        <h3 className="mt-2 -mb-1">Luxury Price</h3>
-                        <input
-                            type="number"
-                            value={priceToOutput.luxury}
-                            onChange={(ev) =>
-                                setPriceToOutput((prev) => ({ ...prev, luxury: Number(ev.target.value) }))
-                            }
-                            placeholder="Luxury price"
-                        />
-                    </div>
+                    {Object.keys(priceToOutput).map((category) => (
+                        <div key={category}>
+                            <h3 className="font-bold">{category.charAt(0).toUpperCase() + category.slice(1)} Price</h3>
+                            <input
+                                type="number"
+                                value={priceToOutput[category]}
+                                onChange={(ev) => setPriceToOutput(prev => ({ ...prev, [category]: Number(ev.target.value) }))}
+                                placeholder={`${category} price`}
+                            />
+                        </div>
+                    ))}
                 </div>
+
+                {preInput("Itinerary", "Add daily activities for each pricing category.")}
+                {Object.keys(itinerary).map((category) => (
+                    <div key={category}>
+                        <h3 className="font-bold">{category.charAt(0).toUpperCase() + category.slice(1)} Itinerary</h3>
+                        {renderItineraryInputs(category)}
+                    </div>
+                ))}
 
                 <button className="primary my-4">Save</button>
             </form>

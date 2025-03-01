@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 
+const itinerarySchema = new mongoose.Schema({
+    day: Number,
+    activity: String
+});
+
 const placeSchema = new mongoose.Schema({
     title: String,
     locationsToVisit: String,
@@ -12,7 +17,12 @@ const placeSchema = new mongoose.Schema({
         medium: Number,
         luxury: Number
     },
-    basePrice: Number // Always set to economy price
+    basePrice: Number,
+    itinerary: {
+        economy: { type: [itinerarySchema], default: [{ day: 1, activity: '' }, { day: 2, activity: '' }, { day: 3, activity: '' }] },
+        medium: { type: [itinerarySchema], default: [{ day: 1, activity: '' }, { day: 2, activity: '' }, { day: 3, activity: '' }, { day: 4, activity: '' }] },
+        luxury: { type: [itinerarySchema], default: [{ day: 1, activity: '' }, { day: 2, activity: '' }, { day: 3, activity: '' }, { day: 4, activity: '' }, { day: 5, activity: '' }] }
+    }
 });
 
 const Place = mongoose.model('Place', placeSchema);

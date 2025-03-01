@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -16,6 +17,8 @@ const app = express();
 
 const bcryptSalt = bcrypt.genSaltSync(10);
 const jwtSecret = 'bsbvdsvnonsvnslvbsdlvsn';
+
+const ADMIN_EMAILS = ["namanrst@gmail.com", "harshvs@gmail.com"];
 
 app.use(express.json());
 app.use(cookieParser());
@@ -92,17 +95,55 @@ app.get('/profile', async (req, res) => {
     });
 });
 
+// Personality Test Submission Endpoint
+app.post('/submit-personality-test', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const { responses } = req.body;
+        
+        if (!responses || responses.length !== 25) {
+            return res.status(400).json({ error: "Invalid responses. Must have 25 values." });
+        }
+        
+        // Calculate trait scores
+        const extraversion = responses.slice(0, 5).reduce((a, b) => a + b, 0);
+        const neuroticism = responses.slice(5, 10).reduce((a, b) => a + b, 0);
+        const agreeableness = responses.slice(10, 15).reduce((a, b) => a + b, 0);
+        const conscientiousness = responses.slice(15, 20).reduce((a, b) => a + b, 0);
+        const openness = responses.slice(20, 25).reduce((a, b) => a + b, 0);
+        
+        // Compute personality category scores
+        const categories = {
+            "Strategic Leader": (0.5 * conscientiousness) + (0.3 * extraversion) + (0.2 * (25 - neuroticism)),
+            "Expressive Connector": (0.5 * extraversion) + (0.3 * agreeableness) + (0.2 * openness),
+            "Independent Thinker": (0.5 * openness) + (0.3 * conscientiousness) + (0.2 * (25 - extraversion)),
+            "Resilient Caregiver": (0.5 * agreeableness) + (0.3 * neuroticism) + (0.2 * conscientiousness),
+            "Tactical Realist": (0.5 * conscientiousness) + (0.3 * (25 - agreeableness)) + (0.2 * neuroticism)
+        };
+        
+        // Determine highest scoring category
+        const personalityCategory = Object.keys(categories).reduce((a, b) => categories[a] > categories[b] ? a : b);
+        
+        // Update user document
+        await User.findByIdAndUpdate(userData.id, {
+            personalityCategory,
+            personalityScores: { extraversion, neuroticism, agreeableness, conscientiousness, openness }
+        });
+        
+        res.json({ message: "Personality test submitted successfully!", personalityCategory });
+    } catch (err) {
+        console.error("❌ Error in submitting personality test:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
 // 🟢 FETCH USER INFO BY EMAIL
 app.get('/user-info/:email', async (req, res) => {
     try {
         const { email } = req.params;
-
-        // ✅ Fetch socialMediaID along with other user details
-        const user = await User.findOne({ email }).select("name email age profession addressLine1 addressLine2 addressLine3 socialMediaID");
-
+        const user = await User.findOne({ email }).select("name email age profession addressLine1 addressLine2 addressLine3 socialMediaID personalityCategory personalityScores");
+        
         if (!user) return res.status(404).json({ error: "User not found" });
-
-        // console.log("✅ API Response:", user); // Debugging log
         res.json(user);
     } catch (err) {
         console.error("❌ Error fetching user info:", err);
@@ -131,7 +172,7 @@ app.post('/upload', photosMiddleware.array('photos', 100), async (req, res) => {
 // 🟢 CREATE PLACE
 app.post('/places', async (req, res) => {
     const { token } = req.cookies;
-    const { title, locationsToVisit, addedPhotos, description, priceToOutput, perks, extraInfo } = req.body;
+    const { title, locationsToVisit, addedPhotos, description, priceToOutput, perks, extraInfo, itinerary } = req.body;
 
     jwt.verify(token, jwtSecret, {}, async (err, userData) => {
         if (err) return res.status(403).json({ error: "Invalid token" });
@@ -140,7 +181,8 @@ app.post('/places', async (req, res) => {
             const placeDoc = await Place.create({
                 title, locationsToVisit, photos: addedPhotos,
                 description, perks, extraInfo,
-                priceToOutput, basePrice: priceToOutput.economy
+                priceToOutput, basePrice: priceToOutput.economy,
+                itinerary
             });
 
             console.log("✅ New Place Created - ID:", placeDoc._id);
@@ -151,21 +193,57 @@ app.post('/places', async (req, res) => {
     });
 });
 
+// 🟢 UPDATE PLACE
+app.put('/places/:id', async (req, res) => {
+    try {
+        const placeId = req.params.id;
+        const updatedData = req.body;
+
+        const updatedPlace = await Place.findByIdAndUpdate(placeId, updatedData, { new: true });
+
+        if (!updatedPlace) {
+            return res.status(404).json({ error: "Place not found" });
+        }
+
+        res.json(updatedPlace);
+    } catch (err) {
+        res.status(500).json({ error: "Error updating place", details: err.message });
+    }
+});
+
+app.get('/places/:id', async (req, res) => {
+    try {
+        const place = await Place.findById(req.params.id);
+        if (!place) return res.status(404).json({ error: "Place not found" });
+
+        res.json(place);
+    } catch (err) {
+        res.status(500).json({ error: "Error fetching place", details: err.message });
+    }
+});
+
 // 🟢 FETCH ALL PLACES
 app.get('/places', async (req, res) => {
     res.json(await Place.find());
 });
 
 // 🟢 FETCH PLACE BY ID
-app.get('/places/:id', async (req, res) => {
+app.get('/bookings/:id', async (req, res) => {
     try {
-        const place = await Place.findById(req.params.id);
-        if (!place) return res.status(404).json({ error: "Place not found" });
+        const booking = await Booking.findById(req.params.id).populate({
+            path: 'users',
+            select: 'name email'
+        }).populate({
+            path: 'place',
+            select: 'title locationsToVisit photos description priceToOutput itinerary'
+        });
 
-        // console.log("✅ Place Found - ID:", place._id);
-        res.json(place);
+        if (!booking) return res.status(404).json({ error: "Booking not found." });
+
+        res.json(booking);
     } catch (err) {
-        res.status(500).json({ error: "Error fetching place", details: err.message });
+        console.error("Error fetching booking:", err);
+        res.status(500).json({ error: "Error fetching booking", details: err.message });
     }
 });
 
@@ -173,8 +251,14 @@ app.get('/places/:id', async (req, res) => {
 app.post('/bookings', async (req, res) => {
     try {
         const userData = await getUserDataFromReq(req);
-        const { place, checkIn, priceSelectedByUser } = req.body;
+        const user = await User.findById(userData.id);
+        
+        if (!user || !user.personalityCategory) {
+            return res.status(400).json({ error: "You must complete the personality test before booking." });
+        }
 
+        const { place, checkIn, priceSelectedByUser } = req.body;
+        
         if (!place || !checkIn || !priceSelectedByUser) {
             return res.status(400).json({ error: "Missing required fields." });
         }
@@ -184,61 +268,42 @@ app.post('/bookings', async (req, res) => {
             return res.status(404).json({ error: "Place not found." });
         }
 
-        const allBookings = await Booking.find({ place: foundPlace._id });
-        // console.log("📌 All bookings for this place:", allBookings);
-
         const checkInDate = new Date(checkIn);
         checkInDate.setHours(0, 0, 0, 0);
 
-        const existingBooking = await Booking.findOne({
+        let existingBookings = await Booking.find({
             place: foundPlace._id,
             priceSelectedByUser: Number(priceSelectedByUser),
             checkIn: { 
                 $gte: checkInDate, 
                 $lt: new Date(checkInDate.getTime() + 86400000) // Adds 1 day
             }
-        });
+        }).populate('users');
 
-        console.log("🔍 Checking for existing booking:", { 
-            place: foundPlace._id, 
-            checkIn: checkInDate, 
-            priceSelectedByUser: Number(priceSelectedByUser) 
-        });
-        console.log("⚠️ Existing booking found?", existingBooking);
-
-        if (existingBooking) {
-            const isUserAlreadyBooked = existingBooking.users.includes(userData.id);
-
-            if (isUserAlreadyBooked) {
-                return res.status(409).json({ 
-                    error: "You have already booked this trip.", 
-                    bookingId: existingBooking._id 
-                });
+        let selectedBooking = null;
+        
+        for (let booking of existingBookings) {
+            const personalityCount = booking.users.filter(u => u.personalityCategory === user.personalityCategory).length;
+            if (booking.users.length < 10 && personalityCount < 2) {
+                selectedBooking = booking;
+                break;
             }
-
-            // 🟢 Step 6: If user is not in the booking, add them
-            existingBooking.users.push(userData.id);
-            await existingBooking.save();
-
-            return res.json({ 
-                message: "You have been added to the existing booking.", 
-                bookingId: existingBooking._id 
-            });
         }
 
-        // 🟢 Step 7: If no existing booking, create a new one
+        if (selectedBooking) {
+            selectedBooking.users.push(user._id);
+            await selectedBooking.save();
+            return res.json({ message: "You have been added to an existing booking.", bookingId: selectedBooking._id });
+        }
+
         const newBooking = await Booking.create({
             place: foundPlace._id,
-            users: [userData.id], 
+            users: [user._id],
             checkIn: checkInDate,
             priceSelectedByUser: Number(priceSelectedByUser)
         });
 
-        return res.json({ 
-            message: "Booking created successfully!", 
-            bookingId: newBooking._id 
-        });
-
+        return res.json({ message: "New booking created successfully!", bookingId: newBooking._id });
     } catch (err) {
         console.error("❌ Error in booking:", err);
         res.status(500).json({ error: "Internal Server Error", details: err.message });
@@ -280,22 +345,194 @@ app.get('/bookings', async (req, res) => {
     }
 });
 
-app.get('/bookings/:id', async (req, res) => {
+// Check if user is an admin
+app.get('/is-admin', async (req, res) => {
     try {
-        const booking = await Booking.findById(req.params.id).populate({
-            path: 'users',
-            select: 'name email'
-        }).populate({
-            path: 'place',
-            select: 'title locationsToVisit photos description priceToOutput'
-        });
-
-        if (!booking) return res.status(404).json({ error: "Booking not found." });
-
-        res.json(booking);
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.json({ isAdmin: false });
+        }
+        res.json({ isAdmin: true });
     } catch (err) {
-        console.error("Error fetching booking:", err);
-        res.status(500).json({ error: "Error fetching booking", details: err.message });
+        console.error("❌ Error checking admin status:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Fetch all users
+app.get('/admin/users', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        const users = await User.find().select("name email personalityCategory bookingIds");
+        res.json(users);
+    } catch (err) {
+        console.error("❌ Error fetching users:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Delete a user
+app.delete('/admin/users/:id', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ message: "User deleted successfully." });
+    } catch (err) {
+        console.error("❌ Error deleting user:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Reset personality test
+app.put('/admin/users/:id/reset-personality', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        await User.findByIdAndUpdate(req.params.id, {
+            personalityCategory: null,
+            personalityScores: {
+                extraversion: null,
+                neuroticism: null,
+                agreeableness: null,
+                conscientiousness: null,
+                openness: null
+            }
+        });
+        
+        res.json({ message: "User's personality test has been reset." });
+    } catch (err) {
+        console.error("❌ Error resetting personality test:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Fetch all bookings
+app.get('/admin/bookings', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        const bookings = await Booking.find()
+            .populate({ path: 'users', select: 'name email personalityCategory' })
+            .populate({ path: 'place', select: 'title' });
+        
+        res.json(bookings);
+    } catch (err) {
+        console.error("❌ Error fetching bookings:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Delete a booking
+app.delete('/admin/bookings/:id', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        await Booking.findByIdAndDelete(req.params.id);
+        res.json({ message: "Booking deleted successfully." });
+    } catch (err) {
+        console.error("❌ Error deleting booking:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Fetch all places
+app.get('/admin/places', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        const places = await Place.find();
+        res.json(places);
+    } catch (err) {
+        console.error("❌ Error fetching places:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Delete a place
+app.delete('/admin/places/:id', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        await Place.findByIdAndDelete(req.params.id);
+        res.json({ message: "Place deleted successfully." });
+    } catch (err) {
+        console.error("❌ Error deleting place:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Update a place
+app.put('/admin/places/:id', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        const updatedPlace = await Place.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updatedPlace);
+    } catch (err) {
+        console.error("❌ Error updating place:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
+    }
+});
+
+// Admin route: Add a new place
+app.post('/admin/places', async (req, res) => {
+    try {
+        const userData = await getUserDataFromReq(req);
+        const user = await User.findById(userData.id);
+        
+        if (!user || !ADMIN_EMAILS.includes(user.email)) {
+            return res.status(403).json({ error: "Access denied. Admins only." });
+        }
+        
+        const newPlace = await Place.create(req.body);
+        res.json(newPlace);
+    } catch (err) {
+        console.error("❌ Error creating place:", err);
+        res.status(500).json({ error: "Internal Server Error", details: err.message });
     }
 });
 
