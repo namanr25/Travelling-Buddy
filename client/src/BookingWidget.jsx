@@ -1,4 +1,3 @@
-
 import { useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { Navigate } from "react-router-dom";
@@ -8,13 +7,13 @@ export default function BookingWidget({ place }) {
   const [checkIn, setCheckIn] = useState("");
   const [priceCategory, setPriceCategory] = useState("economic");
   const [priceSelectedByUser, setPriceSelectedByUser] = useState(place.basePrice);
-  const [tripDuration, setTripDuration] = useState(3); // Default: Economy (3 days)
+  const [tripDuration, setTripDuration] = useState(3);
   const [redirect, setRedirect] = useState(null);
   const { user } = useContext(UserContext);
 
   useEffect(() => {
-    setPriceSelectedByUser(place.basePrice); // Default to base (economic) price
-    setTripDuration(3); // Set default trip duration
+    setPriceSelectedByUser(place.basePrice); 
+    setTripDuration(3);
   }, [place.basePrice]);
 
   function handlePriceChange(category) {
@@ -47,8 +46,6 @@ export default function BookingWidget({ place }) {
         priceSelectedByUser,
       });
 
-      console.log("🟢 Booking Response:", response.data);
-
       if (response.data.message.includes("Booking created successfully")) {
         alert("Booking successful!");
       } else if (response.data.message.includes("You have been added")) {
@@ -58,7 +55,7 @@ export default function BookingWidget({ place }) {
       setRedirect(`/account/bookings/${response.data.bookingId}`);
 
     } catch (error) {
-      console.error("❌ Booking failed", error);
+      console.error(" Booking failed", error);
 
       if (error.response?.status === 409) {
         const proceed = window.confirm("You have already booked this trip. Do you want to view your booking?");

@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { useContext, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
@@ -12,18 +13,26 @@ export default function LoginPage() {
     async function handleLoginSubmit(ev) {
         ev.preventDefault();
         try {
-            const response = await axios.post('/login', { email, password });
-            const userInfo = response.data; // Access the data property
-            setUser(userInfo);
-            alert('Login Successful');
-            setRedirect(true);
+            const response = await axios.post('https://travelling-buddy.onrender.com/login', { email, password });
+
+            console.log("Login Response:", response.data); //Debugging log
+
+            if (response.data.token) {
+                localStorage.setItem("token", response.data.token); //Store the JWT Token
+                setUser(response.data.user); //Store user data in context
+                alert("Login Successful");
+                setRedirect(true);
+            } else {
+                alert("Login failed: No token received");
+            }
         } catch (e) {
-            alert('Login failed');
+            console.error("Login error:", e.response?.data || e);
+            alert("Login failed");
         }
     }
 
     if (redirect) {
-        return <Navigate to={'/'} />  
+        return <Navigate to="/" />;
     }
 
     return (
@@ -45,7 +54,7 @@ export default function LoginPage() {
                     />
                     <button className="primary">Login</button>
                     <div className="text-center py-2 text-gray-500">
-                        Don't have an account yet? <Link className="underline text-black" to={'/register'}>Register now</Link>
+                        Don't have an account yet? <Link className="underline text-black" to="/register">Register now</Link>
                     </div>
                 </form>
             </div>

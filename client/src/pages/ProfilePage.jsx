@@ -105,7 +105,7 @@ export default function ProfilePage() {
                             bookings.map(booking => (
                                 <div key={booking._id} className="w-64 bg-gray-100 p-4 rounded-lg shadow-md">
                                     {booking.place?.photos?.length > 0 && (
-                                        <img src={`http://localhost:4000/uploads/${booking.place.photos[0]}`} alt="Place" className="w-full h-32 object-cover rounded-md" />
+                                        <img src={`https://travelling-buddy.onrender.com/uploads/${booking.place.photos[0]}`} alt="Place" className="w-full h-32 object-cover rounded-md" />
                                     )}
                                     <h3 className="font-semibold text-lg mt-2">{booking.place?.title || "Booking Title"}</h3>
                                     <p className="text-gray-500">{new Date(booking.checkIn).toLocaleDateString()}</p>

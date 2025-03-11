@@ -1,3 +1,4 @@
+
 import Image from "./Image.jsx";
 
 export default function PlaceImg({ place, index = 0, className = "object-cover w-full h-full rounded-lg" }) {

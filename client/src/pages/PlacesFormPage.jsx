@@ -84,7 +84,7 @@ export default function PlacesFormPage() {
             }
             setRedirect(true);
         } catch (error) {
-            alert("❌ Error saving place. Please try again.");
+            alert("Error saving place. Please try again.");
             console.error("Error:", error);
         }
     }

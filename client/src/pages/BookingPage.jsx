@@ -1,29 +1,99 @@
+
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import AddressLink from "../AddressLink";
 import PlaceGallery from "../PlaceGallery";
+import { useContext } from "react";
+import { UserContext } from "../UserContext";
 
 export default function BookingPage() {
     const { id } = useParams();
     const [booking, setBooking] = useState(null);
+    const [reviewed, setReviewed] = useState(false);
+    const [reviewText, setReviewText] = useState("");
+    const [rating, setRating] = useState(0);
+    const [submittedReview, setSubmittedReview] = useState(null);
+    const { user } = useContext(UserContext);
 
     useEffect(() => {
         if (!id) return;
         axios.get(`/bookings/${id}`)
             .then(response => {
-                console.log("✅ Booking Found:", response.data);
                 setBooking(response.data);
+                checkIfReviewed(response.data);
             })
-            .catch(error => console.error("❌ Error fetching booking:", error));
+            .catch(error => console.error("Error fetching booking:", error));
     }, [id]);
 
-    if (!booking) {
-        return <p className="text-center text-gray-500">Loading...</p>;
+    function checkIfReviewed(booking) {
+        if (!booking?.place?._id || !user?._id) return;
+        axios.get(`/places/${booking.place._id}/reviews`)
+            .then(response => {
+                const userReview = response.data.find(r => r.userId._id === user._id);
+                if (userReview) {
+                    setReviewed(true);
+                    setSubmittedReview(userReview);
+                    setRating(userReview.rating);
+                    setReviewText(userReview.reviewText);
+                }
+            })
+            .catch(error => console.error("Error checking reviews:", error));
+    }
+
+    function handleSubmitReview() {
+        if (!user || !user._id) {
+            console.error("No logged-in user found!");
+            return;
+        }
+    
+        if (!reviewText.trim()) {
+            console.error("Review text cannot be empty!");
+            return;
+        }
+    
+        // If the user has already submitted a review, update it (PUT)
+        if (submittedReview) {
+            axios.put(`/places/${booking.place._id}/reviews/${submittedReview._id}`, {
+                userId: user._id,
+                rating,
+                reviewText
+            }).then(response => {
+                console.log("Review updated successfully:", response.data);
+                setReviewed(true);
+                setSubmittedReview({ ...submittedReview, rating, reviewText });
+            }).catch(error => console.error("Error editing review:", error));
+        } else {
+            // If no review exists, create a new review (POST)
+            axios.post(`/places/${booking.place._id}/reviews`, {
+                userId: user._id,
+                rating,
+                reviewText
+            }).then(response => {
+                console.log("Review added successfully:", response.data);
+                setReviewed(true);
+                setSubmittedReview(response.data); 
+            }).catch(error => console.error("Error submitting review:", error));
+        }
+    }
+
+    function handleEditReview() {
+        setReviewed(false); 
+    }
+
+    function handleDeleteReview() {
+        axios.delete(`/places/${booking.place._id}/reviews/${submittedReview._id}`, {
+            data: { userId: user._id }
+        }).then(() => {
+            setReviewed(false);
+            setSubmittedReview(null);
+            setRating(0);
+            setReviewText("");
+        }).catch(error => console.error("Error deleting review:", error));
     }
 
     function calculateCheckOutDate() {
-        if (!booking.checkIn || !booking.place || !booking.place.priceToOutput) return "N/A";
+        if (!booking?.checkIn || !booking?.place?.priceToOutput) return "N/A";
         let daysToAdd = 3;
         if (booking.priceSelectedByUser === booking.place.priceToOutput.medium) daysToAdd = 4;
         if (booking.priceSelectedByUser === booking.place.priceToOutput.luxury) daysToAdd = 5;
@@ -33,7 +103,7 @@ export default function BookingPage() {
     }
 
     function getPriceCategory() {
-        if (!booking.place || !booking.place.priceToOutput) return "Unknown";
+        if (!booking?.place?.priceToOutput) return "Unknown";
         if (booking.priceSelectedByUser === booking.place.priceToOutput.economy) return "Economy";
         if (booking.priceSelectedByUser === booking.place.priceToOutput.medium) return "Medium";
         if (booking.priceSelectedByUser === booking.place.priceToOutput.luxury) return "Luxury";
@@ -42,13 +112,17 @@ export default function BookingPage() {
 
     function getItinerary() {
         const category = getPriceCategory().toLowerCase();
-        return booking.place?.itinerary?.[category] || [];
+        return booking?.place?.itinerary?.[category] || [];
+    }
+
+    if (!booking) {
+        return <p className="text-center text-gray-500">Loading...</p>;
     }
 
     return (
         <div className="my-8">
-            <h1 className="text-3xl font-bold">{booking.place?.title || "Unknown Place"}</h1>
-            <p className="text-gray-600 text-lg mt-2">{booking.place?.locationsToVisit || "Location not specified"}</p>
+            <h1 className="text-3xl font-bold">{booking?.place?.title || "Unknown Place"}</h1>
+            <p className="text-gray-600 text-lg mt-2">{booking?.place?.locationsToVisit || "Location not specified"}</p>
             <AddressLink className="my-2 block">
                 <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.place?.title || "Unknown Location")}`}
@@ -59,7 +133,6 @@ export default function BookingPage() {
                     View on Google Maps
                 </a>
             </AddressLink>
-
             <div className="bg-gray-200 p-6 my-6 rounded-2xl flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl mb-4">Your Booking Information:</h2>
@@ -72,21 +145,12 @@ export default function BookingPage() {
                     <div className="text-md mt-1">Category: {getPriceCategory()}</div>
                 </div>
             </div>
-
             {booking.place?.photos?.length > 0 && (
                 <>
                     <h2 className="text-2xl font-semibold mt-8 mb-4">Place Photos</h2>
                     <PlaceGallery place={booking.place} />
                 </>
             )}
-
-            {booking.place?.description && (
-                <div className="bg-gray-100 p-6 my-6 rounded-2xl">
-                    <h2 className="text-2xl font-semibold mb-2">Description</h2>
-                    <p className="text-gray-700">{booking.place.description}</p>
-                </div>
-            )}
-
             <div className="bg-gray-100 p-6 my-6 rounded-2xl">
                 <h2 className="text-2xl font-semibold mb-2">Itinerary ({getPriceCategory()})</h2>
                 <ul className="list-disc list-inside text-gray-700 space-y-2">
@@ -97,25 +161,31 @@ export default function BookingPage() {
                     ))}
                 </ul>
             </div>
-
-            <h2 className="text-2xl font-semibold mt-8 mb-4">Your Travel Buddies</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {booking.users.length > 1 ? (
-                    booking.users.map((user) => (
-                        <Link key={user._id} to={`/user-profile/${user.email}`} className="bg-gray-100 p-4 rounded-lg shadow-md flex items-center gap-4 hover:bg-gray-200 transition">
-                            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-gray-600">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 21a8.25 8.25 0 0115 0" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p className="text-lg font-semibold text-blue-600 underline">{user.name}</p>
-                                <p className="text-gray-500">{user.email}</p>
-                            </div>
-                        </Link>
-                    ))
+            <div className="bg-gray-100 p-6 my-6 rounded-2xl">
+                <h2 className="text-2xl font-semibold mb-2">Your Review</h2>
+                {reviewed ? (
+                    <div>
+                        <p className="text-lg">⭐ {submittedReview.rating} Stars</p>
+                        <p className="text-gray-700 mt-2">{submittedReview.reviewText}</p>
+                        <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-md" onClick={handleEditReview}>Edit</button>
+                        <button className="mt-4 ml-2 bg-red-500 text-white px-4 py-2 rounded-md" onClick={handleDeleteReview}>Delete</button>
+                    </div>
                 ) : (
-                    <p className="text-gray-500">No other travelers associated with this trip.</p>
+                    <div>
+                        <div className="flex gap-2 mb-4">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <span 
+                                    key={star} 
+                                    className={`cursor-pointer text-3xl ${star <= rating ? 'text-yellow-400' : 'text-gray-400'}`}
+                                    onClick={() => setRating(star)}
+                                >
+                                    ★
+                                </span>
+                            ))}
+                        </div>
+                        <textarea className="w-full p-2 border rounded-md" maxLength={200} value={reviewText} onChange={e => setReviewText(e.target.value)} placeholder="Write your review here (max 200 words)..." />
+                        <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded-md" onClick={handleSubmitReview}>Submit Review</button>
+                    </div>
                 )}
             </div>
         </div>
